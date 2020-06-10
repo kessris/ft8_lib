@@ -15,17 +15,15 @@
 
 #define LOG_LEVEL   LOG_INFO
 
-const int kMin_score = 40;		// Minimum sync score threshold for candidates
 const int kMax_candidates = 120;
 const int kLDPC_iterations = 25;
 
 const int kMax_decoded_messages = 50;
-const int kMax_message_length = 25;
+const int kMax_message_length = 45;
 
 const int kFreq_osr = 2;
 const int kTime_osr = 2;
 
-const float kFSK_dev = 6.25f;    // tone deviation in Hz and symbol rate
 
 void usage() {
     fprintf(stderr, "Decode a 15-second WAV file.\n");
@@ -179,8 +177,10 @@ int main(int argc, char **argv) {
     }
     normalize_signal(signal, num_samples);
 
+    const float fsk_dev = 6.25f;    // tone deviation in Hz and symbol rate
+
     // Compute DSP parameters that depend on the sample rate
-    const int num_bins = (int)(sample_rate / (2 * kFSK_dev));
+    const int num_bins = (int)(sample_rate / (2 * fsk_dev));
     const int block_size = 2 * num_bins;
     const int subblock_size = block_size / kTime_osr;
     const int nfft = block_size * kFreq_osr;
@@ -201,7 +201,7 @@ int main(int argc, char **argv) {
 
     // Find top candidates by Costas sync score and localize them in time and frequency
     ft8::Candidate candidate_list[kMax_candidates];
-    int num_candidates = ft8::find_sync(&power, ft8::kCostas_map, kMax_candidates, candidate_list, kMin_score);
+    int num_candidates = ft8::find_sync(&power, ft8::kCostas_map, kMax_candidates, candidate_list);
 
     // TODO: sort the candidates by strongest sync first?
 
@@ -210,10 +210,8 @@ int main(int argc, char **argv) {
     int     num_decoded = 0;
     for (int idx = 0; idx < num_candidates; ++idx) {
         ft8::Candidate &cand = candidate_list[idx];
-        if (cand.score < kMin_score) continue;
-
-        float freq_hz  = (cand.freq_offset + (float)cand.freq_sub / kFreq_osr) * kFSK_dev;
-        float time_sec = (cand.time_offset + (float)cand.time_sub / kTime_osr) / kFSK_dev;
+        float freq_hz  = (cand.freq_offset + (float)cand.freq_sub / kFreq_osr) * fsk_dev;
+        float time_sec = (cand.time_offset + (float)cand.time_sub / kTime_osr) / fsk_dev;
 
         float   log174[ft8::N];
         ft8::extract_likelihood(&power, cand, ft8::kGray_map, log174);
